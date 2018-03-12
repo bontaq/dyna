@@ -41,7 +41,10 @@ parsePath = do
   return $ Path p
 
 walkTree :: String -> IO (Maybe [Path])
-walkTree = parseFromFile (many (try parsePath))
+walkTree = parseFromFile (many (try parsePath)) >>= (\x ->
+                                                      case x of
+                                                        Nothing -> return Nothing
+                                                        Just (Path a) -> walkTree a)
 
 main :: IO ()
 main = do
