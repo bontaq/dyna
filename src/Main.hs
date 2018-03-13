@@ -4,6 +4,7 @@ module Main where
 
 import Text.RawString.QQ
 import Text.Trifecta
+import Control.Monad
 
 
 exampleImport = [r|
@@ -40,11 +41,8 @@ parsePath = do
   _ <- skipSome (string "';\n")
   return $ Path p
 
-walkTree :: String -> IO (Maybe [Path])
-walkTree = parseFromFile (many (try parsePath)) >>= (\x ->
-                                                      case x of
-                                                        Nothing -> return Nothing
-                                                        Just (Path a) -> walkTree a)
+findPaths :: Path -> IO (Maybe [Path])
+findPaths (Path p) = parseFromFile (many (try parsePath)) p
 
 main :: IO ()
 main = do
