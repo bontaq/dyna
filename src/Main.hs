@@ -2,9 +2,10 @@
 
 module Main where
 
-import Text.RawString.QQ
-import Text.Trifecta
-import Control.Monad
+import           Control.Monad
+import           Control.Monad.IO.Class
+import           Text.RawString.QQ
+import           Text.Trifecta
 
 
 exampleImport = [r|
@@ -29,7 +30,7 @@ mapStateToProps = (state: Blah) => {
 data Path = Path String
             deriving (Eq, Show)
 
-data Graph = Graph Path
+data Node = Node Path
 
 parsePath :: Parser Path
 parsePath = do
@@ -44,7 +45,20 @@ parsePath = do
 findPaths :: Path -> IO (Maybe [Path])
 findPaths (Path p) = parseFromFile (many (try parsePath)) p
 
+
+walkPath :: Path -> [Path] -> IO [Maybe [Path]]
+walkPath (Path a) (paths) = sequence $ map findPaths paths
+
+walkPaths p = do
+  ps <- findPaths p
+  let n = (fmap . fmap) findPaths ps
+      b = (fmap . fmap . fmap . fmap . fmap) walkPaths n
+  return ps
+
+
 main :: IO ()
 main = do
-  putStrLn . show $ parseString (many (try parsePath)) mempty exampleImports
-  putStrLn "hello world"
+  m <- findPaths $ Path "./data/index.ts"
+--   n <- walkPath (Path "") m
+--   putStrLn . show $ n
+  putStrLn "bebe"
