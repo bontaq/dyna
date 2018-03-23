@@ -5,10 +5,10 @@ module Main where
 import           Control.Exception.Base
 import           Control.Monad
 import           Control.Monad.IO.Class
+-- import           Data.Maybe
 import           Text.RawString.QQ
 import           Text.Trifecta          hiding (try)
 import qualified Text.Trifecta          as T
-
 
 
 exampleImport = [r|
@@ -29,11 +29,7 @@ mapStateToProps = (state: Blah) => {
 }
 |]
 
---type Path = String;
-data Path = Path String
-             deriving (Eq, Show)
-
-data Node = Node Path
+type Path = String
 
 parsePath :: Parser Path
 parsePath = do
@@ -43,54 +39,61 @@ parsePath = do
   _ <- skipSome (char '\'')
   p <- many (noneOf "'")
   _ <- skipSome (string "';\n")
-  return $ Path p
+  return $ p
 
---findPaths :: Path -> IO (Maybe [Path])
---findPaths :: (MonadIO m, Parsing m) => Path -> m (Maybe [Path])
 findPaths :: Path -> IO (Either SomeException (Maybe [Path]))
-findPaths (Path p) =
+findPaths p =
   try $ parseFromFile (many (T.try parsePath)) p
 
--- findPaths' p = do
---   result <- findPaths' p
---   return ()
-
-
-
--- walkPath :: Path -> [Path] -> IO [Maybe [Path]]
--- walkPath (Path a) (paths) = sequence $ map findPaths paths
-
--- ok, seems like we need a real parser for the files?
--- secondly, we need errors
-
--- ./data
--- index
--- finds: ./pages/Landing
-
 onPath :: (String -> String) -> Path -> Path
-onPath fn (Path p) = Path $ fn p
+onPath fn p = fn p
 
--- walkPaths :: Path -> Path -> IO [Maybe Path]
-walkPaths :: Path -> Path -> IO [Either SomeException (Maybe [Path])]
-walkPaths (Path base) (Path p) = do
-  let path = Path $ concat [base, p]
-      cleanPath :: [Char] -> [Char]
-      cleanPath = filter (/= '.')
-      withTS = (flip (++) ".ts")
-  ps <- findPaths path
-  case ps of
-    Left e   -> return $ [Left e]
-    Right (Just ps') ->
-      -- FUCK YEAH HASKELL
-      let cleanBase = Path $ '.' : cleanPath base
-          cleanPaths = fmap (onPath cleanPath) ps'
-          withTSPaths = fmap (onPath withTS) cleanPaths
-      in
-        fmap concat $ sequence . join $ (fmap . fmap) (walkPaths cleanBase) [withTSPaths]
+-- walkPaths :: Path -> Path -> IO (Path, [Either SomeException (Maybe [Path])])
+-- walkPaths base p = do
+--   let path :: Path
+--       path = concat [base, p]
+--       cleanPath :: [Char] -> [Char]
+--       cleanPath = filter (/= '.')
+--       withTS = (flip (++) ".ts")
+--   ps <- findPaths path
+--   case ps of
+--     Left e   -> return $ (path, [Left e])
+--     Right (Just ps') ->
+--       let cleanBase = '.' : cleanPath base
+--           cleanPaths = fmap (onPath cleanPath) ps'
+--           withTSPaths = fmap (onPath withTS) cleanPaths
+--           newPaths = (fmap . fmap) (walkPaths cleanBase) [withTSPaths]
+--           joined = join newPaths
+--           sequenced = sequence joined
+--       in
+--         sequenced >>= (\seq -> return (path, seq))
+
+data Tree a =
+  Tree Path (Tree a)
+  | Leaf [a]
+  | TNothing
+  deriving (Show)
+
+handlePaths :: Either a1 (Maybe [a2]) -> Tree a2
+handlePaths (Left _)           = TNothing
+handlePaths (Right maybePaths) =
+  case maybePaths of
+    Just (paths) -> Leaf paths
+    Nothing      -> TNothing
+
+walkPaths :: Path -> IO (Tree Path)
+walkPaths p = do
+  let a = findPaths p
+      b = a >>= (\n -> return $ handlePaths n)
+  c <- b
+  return $ Tree p c
+
+walkPaths' p = do
+  paths <- walkPaths p
+  return ()
 
 main :: IO ()
 main = do
-  --m <- findPaths $ Path "./data/index.ts"
-  n <- walkPaths (Path "./data") (Path "/index.ts")
+  putStrLn "sup"
+  n <- walkPaths ("./data/index.ts")
   putStrLn . show $ n
-  --putStrLn .show $ m
